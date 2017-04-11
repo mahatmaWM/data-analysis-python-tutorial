@@ -16,7 +16,7 @@ class PPCA():
             raise RuntimeError("Fit model first")
         return (X - self.means) / self.stds
 
-    def fit(self, data, d=None, tol=1e-4, min_obs=1, verbose=False):
+    def fit(self, data, d=None, tol=1e-10, min_obs=1, verbose=False):
         # step1：根据min_obs来决定需要保留下来的维度
         self.rawdata = data
         self.rawdata[np.isinf(self.rawdata)] = np.max(self.rawdata[np.isfinite(self.rawdata)])
@@ -51,7 +51,7 @@ class PPCA():
 
         # 开始EM迭代
         while True:
-            print(CC, ss)
+            # print(CC, ss)
             Sx = np.linalg.inv(np.eye(d) + CC / ss)
 
             # e-step
@@ -126,14 +126,30 @@ class PPCA():
     def load(self, fpath):
         assert os.path.isfile(fpath)
         self.C = np.load(fpath)
+    def getnewdata(self):
+        return self.newdata
 
 
-import numpy as np
-from _ppca import PPCA
+from sklearn import decomposition
+from sklearn import datasets
 
-X = np.array([[-1, -1], [-2, -1], [-3, -2], [1, 1], [2, 1], [3, 2]])
+np.random.seed(5)
+iris = datasets.load_iris()
+X = iris.data
 # print(X)
-# print(X.T)
-# print(np.dot(X.T,X))
+# pca = decomposition.PCA(n_components=3)
+# pca.fit(X)
+# X = pca.transform(X)
+# print(X)
+
+X_with_miss = X.copy()
+X_with_miss[X_with_miss == 2.5] = np.nan
+# print(X_new)
+
+
+
 ppca = PPCA()
-ppca.fit(X.T, d=1, min_obs=0)
+ppca.fit(X_with_miss, d=3, min_obs=5, verbose=0)
+X_with_miss = ppca.transform()
+print(X_with_miss)
+
