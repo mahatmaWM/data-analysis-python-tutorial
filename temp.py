@@ -1,13 +1,12 @@
 import os
-
 import numpy as np
 from scipy.linalg import orth
 
 
 class PPCA():
     def __init__(self):
-        self.raw = None
-        self.data = None
+        self.rawdata = None
+        self.newdata = None
         self.C = None
         self.means = None
         self.stds = None
@@ -17,29 +16,26 @@ class PPCA():
             raise RuntimeError("Fit model first")
         return (X - self.means) / self.stds
 
-    def fit(self, data, d=None, tol=1e-4, min_obs=10, verbose=False):
-        self.raw = data
-        self.raw[np.isinf(self.raw)] = np.max(self.raw[np.isfinite(self.raw)])
-
-        # 先把缺省值太多的列去掉
-        valid_series = np.sum(~np.isnan(self.raw), axis=0) >= min_obs
-        data = self.raw[:, valid_series].copy()
+    def fit(self, data, d=None, tol=1e-4, min_obs=1, verbose=False):
+        # step1：根据min_obs来决定需要保留下来的维度
+        self.rawdata = data
+        self.rawdata[np.isinf(self.rawdata)] = np.max(self.rawdata[np.isfinite(self.rawdata)])
+        valid_series = np.sum(~np.isnan(self.rawdata), axis=0) >= min_obs
+        data = self.rawdata[:, valid_series].copy()
         N = data.shape[0]
         D = data.shape[1]
 
-        # 去掉缺省值，然后按列求**
+        # step2：按列标准化剩余数据
         self.means = np.nanmean(data, axis=0)
         self.stds = np.nanstd(data, axis=0)
-
         data = self._standardize(data)
         observed = ~np.isnan(data)
         missing = np.sum(~observed)
         data[~observed] = 0
 
-        # 初始化
+        # 初始化，并计算正向变换、反向变换后的误差，以此决定效果
         if d is None:
             d = data.shape[1]
-
         if self.C is None:
             C = np.random.randn(D, d)
         else:
@@ -53,8 +49,9 @@ class PPCA():
         v0 = np.inf
         counter = 0
 
+        # 开始EM迭代
         while True:
-
+            print(CC, ss)
             Sx = np.linalg.inv(np.eye(d) + CC / ss)
 
             # e-step
@@ -66,26 +63,27 @@ class PPCA():
 
             # m-step
             XX = np.dot(X.T, X)
-            C = np.dot(np.dot(data.T, X), np.linalg.pinv(XX + N * Sx))
+            C = np.dot(np.dot(data.T, X), np.linalg.pinv(XX + N * Sx))  # pseudo-inverse
             CC = np.dot(C.T, C)
             recon = np.dot(X, C.T)
             recon[~observed] = 0
             ss = (np.sum((recon - data) ** 2) + N * np.sum(CC * Sx) + missing * ss0) / (N * D)
 
-            # calc diff for convergence
+            # check convergence
             det = np.log(np.linalg.det(Sx))
             if np.isinf(det):
-                det = abs(np.linalg.slogdet(Sx)[1])
+                det = np.abs(np.linalg.slogdet(Sx)[1])
             v1 = N * (D * np.log(ss) + np.trace(Sx) - det) + np.trace(XX) - missing * np.log(ss0)
-            diff = abs(v1 / v0 - 1)
+            diff = np.abs(v1 / v0 - 1)
             if verbose:
-                print diff
+                print(diff)
             if (diff < tol) and (counter > 5):
                 break
 
             counter += 1
             v0 = v1
 
+        # 迭代完成，为准备输出结果
         C = orth(C)
         vals, vecs = np.linalg.eig(np.cov(np.dot(data, C).T))
         order = np.flipud(np.argsort(vals))
@@ -96,26 +94,26 @@ class PPCA():
 
         # attach objects to class
         self.C = C
-        self.data = data
+        self.newdata = data
         self.eig_vals = vals
         self._calc_var()
 
-        import IPython
-        IPython.embed()
-        assert False
+        # import IPython
+        # IPython.embed()
+        # assert False
 
     def transform(self, data=None):
         if self.C is None:
             raise RuntimeError('Fit the data model first.')
         if data is None:
-            return np.dot(self.data, self.C)
+            return np.dot(self.newdata, self.C)
         return np.dot(data, self.C)
 
     def _calc_var(self):
-        if self.data is None:
+        if self.newdata is None:
             raise RuntimeError('Fit the data model first.')
 
-        data = self.data.T
+        data = self.newdata.T
 
         # variance calc
         var = np.nanvar(data, axis=1)
@@ -128,3 +126,14 @@ class PPCA():
     def load(self, fpath):
         assert os.path.isfile(fpath)
         self.C = np.load(fpath)
+
+
+import numpy as np
+from _ppca import PPCA
+
+X = np.array([[-1, -1], [-2, -1], [-3, -2], [1, 1], [2, 1], [3, 2]])
+# print(X)
+# print(X.T)
+# print(np.dot(X.T,X))
+ppca = PPCA()
+ppca.fit(X.T, d=1, min_obs=0)
