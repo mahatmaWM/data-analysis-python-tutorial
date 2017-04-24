@@ -1,6 +1,5 @@
-主要记录平时使用pandas，matplotlib，numpy的一些流程方法，主要用于前期的数据预处理，持续更新。
-处理具体问题时候可以参考。
+记录使用pandas，matplotlib，numpy进行数据处理的方法。
 
-numpy-100是在网上找到的使用numpy的一些技巧。
 
-http://www.labri.fr/perso/nrougier/teaching/numpy.100/index.html
+notes文件夹：一些读书笔记和教材。
+numpy100文件夹：是在网上找到的使用numpy的一些技巧，http://www.labri.fr/perso/nrougier/teaching/numpy.100/index.html。
